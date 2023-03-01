@@ -1,4 +1,5 @@
 mod math_utils;
+mod vect_utils;
 mod matrix;
 
 fn main() {

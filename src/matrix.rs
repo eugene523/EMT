@@ -10,22 +10,15 @@ pub struct Matrix {
     vals: Vec<f64>
 }
 
-pub struct LuDec {
-    lu_matrix: Matrix,
-    permutation_vec: Vec<usize>
-}
-
 #[allow(dead_code)]
 impl Matrix {
     pub fn new(nrows: usize, ncols: usize) -> Matrix {
-        let mut vals: Vec<f64> = Vec::new();
-        vals.resize(nrows * ncols, 0.0);
+        let mut vals = vec![0.0; nrows * ncols];
         Matrix { nrows, ncols, vals }
     }
 
     pub fn new_square(mat_size: usize) -> Matrix {
-        let mut vals: Vec<f64> = Vec::new();
-        vals.resize(mat_size * mat_size, 0.0);
+        let mut vals = vec![0.0; mat_size * mat_size];
         Matrix { nrows: mat_size, ncols: mat_size, vals }
     }
 
@@ -397,6 +390,26 @@ impl Matrix {
         Some(e)
     }
 
+    pub fn invert_lower_triangular(&self) -> Matrix {
+        assert!(self.is_square());
+        let mat_size = self.nrows;
+        let mut inv_l = Matrix::new_square(mat_size);
+
+        for r in 0..mat_size {
+            let diag = self.get(r, r);
+            for c in 0..r {
+                let mut sum = 0.0;
+                for k in c..r {
+                    sum += self.get(r, k) * self.get(k, c);
+                }
+                let val = -sum / diag;
+                inv_l.set(r, c, val);
+            }
+            inv_l.set(r, r, 1.0 / diag);
+        }
+        return inv_l;
+    }
+
     pub fn det(&self) -> f64 {
         assert!(self.nrows == self.ncols);
 
@@ -529,6 +542,12 @@ impl Matrix {
         }
         Some(LuDec { lu_matrix: m, permutation_vec })
     }
+
+    pub fn permute_rows(&mut self, permutation_vect: &Vec<usize>) {
+        for r in 0..self.nrows {
+            self.swap_rows(r, permutation_vect[r])
+        }
+    }
 }
 
 impl fmt::Display for Matrix {
@@ -542,6 +561,88 @@ impl fmt::Display for Matrix {
         }
         Ok(())
     }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+pub struct LuDec {
+    lu_matrix: Matrix,
+    permutation_vec: Vec<usize>
+}
+
+#[allow(dead_code)]
+impl LuDec {
+    pub fn get_lower_matrix(&self) -> Matrix {
+        let mat_size = self.lu_matrix.nrows;
+        let mut l = Matrix::new_square(mat_size);
+
+        for row in 0..mat_size {
+            l.set(row, row, 1.0);
+            for col in 0..row {
+                let val = self.lu_matrix.get(row, col);
+                l.set(row, col, val);
+            }
+        }
+        return l;
+    }
+
+    pub fn get_upper_matrix(&self) -> Matrix {
+        let mat_size = self.lu_matrix.nrows;
+        let mut u = Matrix::new_square(mat_size);
+        for row in 0..mat_size  {
+            for col in row..mat_size {
+                let val = self.lu_matrix.get(row, col);
+                u.set(row, col, val);
+            }
+        }
+        return u;
+    }
+
+    pub fn get_permutation_matrix(&self) -> Matrix {
+        let mat_size = self.lu_matrix.nrows;
+        let mut p = Matrix::new_square(mat_size);
+        for row in 0..mat_size {
+            let col = self.permutation_vec[row];
+            p.set(row, col, 1.0); 
+        }
+        return p;
+    }
+
+    pub fn solve_ly(&self, pb: &Vec<f64>) -> Vec<f64> {
+        let mat_size = self.lu_matrix.nrows;
+        let mut y = vec![0.0; mat_size];
+
+        for r in 0..mat_size {
+            let mut sum = 0.0;
+            for c in 0..r {
+                sum += self.lu_matrix.get(r, c) * y[c];
+            }
+            y[r] = pb[r] - sum;
+        }
+        return y;
+    }
+
+    pub fn solve_ux(&self, y: &Vec<f64>) -> Vec<f64> {
+        let nrows = self.lu_matrix.nrows;
+        let ncols = self.lu_matrix.ncols;
+        let mut x = vec![0.0; nrows];
+
+        for i in 0..nrows {
+            let r = nrows - 1 - i;
+            let mut sum = 0.0;
+            for c in (r + 1)..ncols {
+                sum += self.lu_matrix.get(r, c) * x[c];
+            }
+            x[r] = (y[r] - sum) / self.lu_matrix.get(r, r);
+        }
+        return x;
+    }
+
+/*
+    pub fn solve(&self, b: &Vec<f64>) -> Vec<f64> {
+        
+    }
+*/
 }
 
 #[cfg(test)]
