@@ -13,12 +13,12 @@ pub struct Matrix {
 #[allow(dead_code)]
 impl Matrix {
     pub fn new(nrows: usize, ncols: usize) -> Matrix {
-        let mut vals = vec![0.0; nrows * ncols];
+        let vals = vec![0.0; nrows * ncols];
         Matrix { nrows, ncols, vals }
     }
 
     pub fn new_square(mat_size: usize) -> Matrix {
-        let mut vals = vec![0.0; mat_size * mat_size];
+        let vals = vec![0.0; mat_size * mat_size];
         Matrix { nrows: mat_size, ncols: mat_size, vals }
     }
 
