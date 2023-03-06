@@ -1,3 +1,4 @@
+use rand::Rng;
 use crate::math_utils;
 
 pub fn same_size(x: &Vec<f64>, y: &Vec<f64>) -> bool {
@@ -8,6 +9,25 @@ pub fn set_zero(x: &mut Vec<f64>) {
     for i in 0..x.len() { 
         x[i] = 0.0; 
     }
+}
+
+pub fn equal_eps(x: &Vec<f64>, y: &Vec<f64>, eps: f64) -> bool {
+    assert!(same_size(x, y));
+    for i in 0..x.len() {
+        if !math_utils::equal_eps(x[i], y[i], eps) {
+            return false;
+        }
+    }
+    return true;
+}
+
+pub fn equal_zero_eps(x: &Vec<f64>, eps: f64) -> bool {
+    for i in 0..x.len() {
+        if !math_utils::equal_eps(x[i], 0.0, eps) {
+            return false;
+        }
+    }
+    return true;
 }
 
 pub fn add(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
@@ -137,21 +157,45 @@ pub fn cross3(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
     return z;
 }
 
-pub fn equal_eps(x: &Vec<f64>, y: &Vec<f64>, eps: f64) -> bool {
-    assert!(same_size(x, y));
-    for i in 0..x.len() {
-        if !math_utils::equal_eps(x[i], y[i], eps) {
-            return false;
-        }
+pub fn new_rnd(vect_size: usize) -> Vec<f64> {
+    let mut v = vec![0.0; vect_size];
+    let mut rng = rand::thread_rng();
+    for i in 0..vect_size {
+        v[i] = rng.gen::<f64>();
     }
-    return true;
+    return v;
 }
 
-pub fn equal_zero_eps(x: &Vec<f64>, eps: f64) -> bool {
-    for i in 0..x.len() {
-        if !math_utils::equal_eps(x[i], 0.0, eps) {
-            return false;
+pub fn new_rnd2(vect_size: usize, nonzero_percent: f64) -> Vec<f64> {
+    let mut v = vec![0.0; vect_size];
+    let mut rng = rand::thread_rng();
+        for i in 0..vect_size {
+            if rng.gen_bool(nonzero_percent) { 
+                v[i] = rng.gen::<f64>();
+            }
         }
+        return v;
+}
+
+pub fn new_rnd_normalized(vect_size: usize) -> Vec<f64> {
+    let mut v = new_rnd(vect_size);
+    normalize_mut(&mut v);
+    return v;
+}
+
+pub fn orthogonalize_mut(basis_vect: &Vec<f64>, x: &mut Vec<f64>) {
+    let d = dot(basis_vect, x);
+    for i in 0..x.len() {
+        x[i] -= d * basis_vect[i];
     }
-    return true;
+}
+
+pub fn gram_schmidt_mut(vectors: &mut Vec<Vec<f64>>) {
+    for i in 0..vectors.len() {
+        let (s1, s2) = vectors.split_at_mut(i);
+        for v in s1 {
+            orthogonalize_mut(&s2[0], v)
+        }
+        normalize_mut(&mut s2[0])
+    }
 }
