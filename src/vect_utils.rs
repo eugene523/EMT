@@ -183,19 +183,61 @@ pub fn new_rnd_normalized(vect_size: usize) -> Vec<f64> {
     return v;
 }
 
-pub fn orthogonalize_mut(basis_vect: &Vec<f64>, x: &mut Vec<f64>) {
-    let d = dot(basis_vect, x);
+pub fn proj(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
+    let d1 = dot(x, y);
+    let d2 = dot(y, y);
+    let d = d1 / d2;
+    let x_proj = mul(y, d);
+    return x_proj;
+}
+
+pub fn orth(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
+    let d1 = dot(x, y);
+    let d2 = dot(y, y);
+    let d = d1 / d2;
+    let mut x_orth = vec![0.0; x.len()];
     for i in 0..x.len() {
-        x[i] -= d * basis_vect[i];
+        x_orth[i] = x[i] - d * y[i];
+    }
+    return x_orth;
+}
+
+pub fn orth_mut(x: &mut Vec<f64>, y: &Vec<f64>) {
+    let d1 = dot(x, y);
+    let d2 = dot(y, y);
+    let d = d1 / d2;
+    for i in 0..x.len() {
+        x[i] -= d * y[i];
     }
 }
 
-pub fn gram_schmidt_mut(vectors: &mut Vec<Vec<f64>>) {
-    for i in 0..vectors.len() {
-        let (s1, s2) = vectors.split_at_mut(i);
-        for v in s1 {
-            orthogonalize_mut(&s2[0], v)
-        }
-        normalize_mut(&mut s2[0])
+fn orth2_mut(x: &mut Vec<f64>, y: &Vec<f64>, dot_yy: f64) {
+    let mut d = dot(x, y);
+    d /= dot_yy;
+    for i in 0..x.len() {
+        x[i] -= d * y[i];
     }
+}
+
+pub fn gram_schmidt(vectors: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let mut orth_vectors: Vec<Vec<f64>> = Vec::new();
+    let mut dot_yy: Vec<f64> = Vec::new();
+
+    for i in 0..vectors.len() {
+        let mut v = vectors[i].clone();
+        for j in 0..i {
+            orth2_mut(&mut v, &orth_vectors[j], dot_yy[j]);
+        }
+        dot_yy.push(dot(&v, &v));
+        orth_vectors.push(v);
+    }
+    return orth_vectors;
+}
+
+pub fn gram_schmidt_norm(vectors: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
+    let mut orth_vectors = gram_schmidt(vectors);
+    for i in 0..orth_vectors.len() {
+        normalize_mut(&mut orth_vectors[i]);
+    }
+    return orth_vectors;
 }
