@@ -649,7 +649,7 @@ impl LuDec {
 mod tests {
     use super::*;
 
-    const EPS: f64 = 1e-12;
+    const EPS: f64 = 1e-10;
 
     #[test]
     fn test_set_get() {

@@ -241,3 +241,130 @@ pub fn gram_schmidt_norm(vectors: Vec<Vec<f64>>) -> Vec<Vec<f64>> {
     }
     return orth_vectors;
 }
+
+pub fn is_symmetric(x: &Vec<f64>, eps: f64) -> bool {
+    let n = x.len();
+    let mid = n / 2;
+    for i in 0..mid {
+        if !math_utils::equal_eps(x[i], x[n - 1 - i], eps) {
+            return false;
+        }
+    }
+    return true;
+}
+
+pub fn is_antisymmetric(x: &Vec<f64>, eps: f64) -> bool {
+    let n = x.len();
+    let mid = n / 2;
+    for i in 0..mid {
+        if !math_utils::equal_eps(x[i], -x[n - 1 - i], eps) {
+            return false;
+        }
+    }
+    return true;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const EPS: f64 = 1e-12;
+
+    #[test]
+    fn test_add() {
+        let mut a = vec![1.0, 2.0, 3.0];
+        let b = vec![4.0, 5.0, 6.0];
+        let c_test = vec![5.0, 7.0, 9.0];
+
+        let c = add(&a, &b);
+        assert!(equal_eps(&c, &c_test, EPS));
+
+        add_mut(&mut a, &b);
+        assert!(equal_eps(&a, &c, EPS));
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut a = vec![1.0, 2.0, 3.0];
+        let b = vec![4.0, 5.0, 6.0];
+        let c_test = vec![-3.0, -3.0, -3.0];
+
+        let c = sub(&a, &b);
+        assert!(equal_eps(&c, &c_test, EPS));
+
+        sub_mut(&mut a, &b);
+        assert!(equal_eps(&a, &c, EPS));
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut a = vec![1.0, 2.0, 3.0];
+        let coeff = 3.0;
+        let b_test = vec![3.0, 6.0, 9.0];
+
+        let b = mul(&a, coeff);
+        assert!(equal_eps(&b, &b_test, EPS));
+
+        mul_mut(&mut a, coeff);
+        assert!(equal_eps(&a, &b_test, EPS));
+    }
+
+    #[test]
+    fn test_div() {
+        let mut a = vec![1.0, 2.0, 3.0];
+        let coeff = 3.0;
+        let b_test = vec![1.0 / 3.0, 2.0 / 3.0, 1.0];
+
+        let b = div(&a, coeff);
+        assert!(equal_eps(&b, &b_test, EPS));
+
+        div_mut(&mut a, coeff);
+        assert!(equal_eps(&a, &b_test, EPS));
+    }
+
+    #[test]
+    fn test_ax_by() {
+        let x = vec![1.0, 3.0, 7.0];  let x_coeff = 2.0;
+        let y = vec![-3.0, 2.0, 5.0]; let y_coeff = 3.0;
+        let c_test = vec![-7.0, 12.0, 29.0];
+
+        let c = ax_plus_by(x_coeff, &x, y_coeff, &y);
+        assert!(equal_eps(&c, &c_test, EPS));
+    }
+
+    #[test]
+    fn test_norm() {
+        let x = vec![1.0, 2.0, 3.0];
+        let n = norm(&x);
+        assert!(math_utils::equal_eps(n, 3.74165, 1e-3));
+    }
+
+    #[test]
+    fn test_normalize() {
+        let mut x = vec![1.0, 2.0, 3.0];
+        let xn = normalize(&x);
+        let xn_test = vec![0.26726, 0.53452, 0.80178];
+        assert!(equal_eps(&xn, &xn_test, 1e-3));
+
+        normalize_mut(&mut x);
+        assert!(equal_eps(&x, &xn, 1e-3));
+    }
+
+    #[test]
+    fn test_dot() {
+        let x = vec![1.0, 2.0, 3.0];
+        let y = vec![4.0, 5.0, 6.0];
+        let d = dot(&x, &y);
+        let d_test = 32.0;
+        assert!(math_utils::equal_eps(d, d_test, EPS));
+    }
+
+    #[test]
+    fn test_cross3() {
+        let x = vec![1.0, 2.0, 3.0];
+        let y = vec![-7.0, 9.0, -15.0];
+        let c_test = vec![-57.0, -6.0, 23.0];
+        let c = cross3(&x, &y);
+        assert!(equal_eps(&c, &c_test, EPS));
+    }
+}
