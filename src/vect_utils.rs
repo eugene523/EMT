@@ -1,3 +1,4 @@
+extern crate rand;
 use rand::Rng;
 use crate::math_utils;
 
@@ -183,6 +184,25 @@ pub fn new_rnd_normalized(vect_size: usize) -> Vec<f64> {
     return v;
 }
 
+pub fn permute(x: &Vec<f64>, permutation_vector: &Vec<usize>) -> Vec<f64> {
+    assert!(x.len() == permutation_vector.len());
+    let mut permuted = vec![0.0; x.len()];
+    for i in 0..x.len() {
+        let pos = permutation_vector[i];
+        permuted[i] = x[pos];
+    }
+    return permuted;
+}
+
+pub fn transpose_permutation_vector(permutation_vector: &Vec<usize>) -> Vec<usize> {
+    let mut transposed: Vec<usize>= vec![0; permutation_vector.len()];
+    for i in 0..permutation_vector.len() {
+        let pos = permutation_vector[i];
+        transposed[pos] = i;
+    }
+    return transposed;
+}
+
 pub fn proj(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
     let d1 = dot(x, y);
     let d2 = dot(y, y);
@@ -191,6 +211,7 @@ pub fn proj(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
     return x_proj;
 }
 
+/// Creates vector that is orthogonal to vector `y` from vector `x`.
 pub fn orth(x: &Vec<f64>, y: &Vec<f64>) -> Vec<f64> {
     let d1 = dot(x, y);
     let d2 = dot(y, y);
@@ -366,5 +387,100 @@ mod tests {
         let c_test = vec![-57.0, -6.0, 23.0];
         let c = cross3(&x, &y);
         assert!(equal_eps(&c, &c_test, EPS));
+    }
+
+    #[test]
+    fn test_orth() {
+        let vect_size: usize = 100;
+        let x = new_rnd(vect_size);
+        let y = new_rnd(vect_size);
+        let x_orth = orth(&x, &y);
+        let d = dot(&x_orth, &y);
+        assert!(math_utils::equal_eps(d, 0.0, EPS));
+    }
+
+    #[test]
+    fn test_gram_schmidt() {
+        let n_vectors = 10;
+        let vect_size = 10;
+        let mut vectors: Vec<Vec<f64>> = Vec::new();
+        for _ in 0..n_vectors {
+            vectors.push(new_rnd(vect_size));
+        }
+
+        let orth_vectors = gram_schmidt(vectors);
+        assert!(orth_vectors.len() == n_vectors);
+        for i in 0..orth_vectors.len() {
+            for j in 0..i {
+                let d = dot(&orth_vectors[i], &orth_vectors[j]);
+                assert![math_utils::equal_eps(d, 0.0, EPS)];
+            }
+        }
+    }
+
+    #[test]
+    fn test_gram_schmidt_norm() {
+        let n_vectors = 10;
+        let vect_size = 10;
+        let mut vectors: Vec<Vec<f64>> = Vec::new();
+        for _ in 0..n_vectors {
+            vectors.push(new_rnd(vect_size));
+        }
+
+        let orth_vectors = gram_schmidt_norm(vectors);
+        assert!(orth_vectors.len() == n_vectors);
+        for i in 0..orth_vectors.len() {
+            for j in 0..i {
+                let d = dot(&orth_vectors[i], &orth_vectors[j]);
+                assert![math_utils::equal_eps(d, 0.0, EPS)];
+            }
+        }
+
+        for i in 0..orth_vectors.len() {
+            let n = norm(&orth_vectors[i]);
+            assert![math_utils::equal_eps(n, 1.0, EPS)];
+        }
+    }
+
+    #[test]
+    fn test_is_symmetric() {
+        let a = vec![3.0];
+        assert!(is_symmetric(&a, EPS));
+
+        let a = vec![ -1.05, -1.05 ];
+        assert!(is_symmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, 2.05, 1.01 ];
+        assert!(is_symmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, 3.0, 2.05, 1.01 ];
+        assert!(is_symmetric(&a, EPS));
+
+	    let a = vec![ -1.05, -1.06 ];
+        assert!(!is_symmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, 3.0, 2.051, 1.01 ];
+        assert!(!is_symmetric(&a, EPS));
+    }
+
+    #[test]
+    fn test_is_antisymmetric() {
+        let a = vec![3.0];
+        assert!(is_antisymmetric(&a, EPS));
+
+        let a = vec![ -1.05, 1.05 ];
+        assert!(is_antisymmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, -2.05, -1.01 ];
+        assert!(is_antisymmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, 3.0, -2.05, -1.01 ];
+        assert!(is_antisymmetric(&a, EPS));
+
+	    let a = vec![ -1.05, 1.06 ];
+        assert!(!is_antisymmetric(&a, EPS));
+
+	    let a = vec![ 1.01, 2.05, 3.0, -2.051, -1.01 ];
+        assert!(!is_antisymmetric(&a, EPS));
     }
 }

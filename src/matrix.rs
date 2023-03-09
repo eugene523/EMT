@@ -1,4 +1,5 @@
 use crate::math_utils;
+use crate::vect_utils;
 use rand::Rng;
 use std::fmt;
 
@@ -22,11 +23,11 @@ impl Matrix {
         Matrix { nrows: mat_size, ncols: mat_size, vals }
     }
 
-    fn same_size(&self, another: &Matrix) -> bool {
+    pub fn same_size(&self, another: &Matrix) -> bool {
         self.nrows == another.nrows && self.ncols == another.ncols
     }
 
-    fn is_square(&self) -> bool { self.nrows == self.ncols }
+    pub fn is_square(&self) -> bool { self.nrows == self.ncols }
 
     pub fn set(&mut self, row: usize, col: usize, val: f64) {
         debug_assert!(row < self.nrows);
@@ -55,7 +56,7 @@ impl Matrix {
         return true;
     }
 
-    pub fn identity(mat_size: usize) -> Matrix {
+    pub fn new_identity(mat_size: usize) -> Matrix {
         let mut m = Matrix::new(mat_size, mat_size);
         for i in 0..mat_size {
             m.set(i, i, 1.0);
@@ -88,7 +89,7 @@ impl Matrix {
         return k;
     }
 
-    pub fn rnd(nrows: usize, ncols: usize, nonzero_percent: f64) -> Matrix {
+    pub fn new_rnd(nrows: usize, ncols: usize, nonzero_percent: f64) -> Matrix {
         assert!(nonzero_percent >= 0.0 && nonzero_percent <= 1.0);
         let mut m = Matrix::new(nrows, ncols);
         if nonzero_percent == 0.0 { return m; }
@@ -102,11 +103,11 @@ impl Matrix {
         return m;
     }
 
-    pub fn rnd_square(mat_size: usize, nonzero_percent: f64) -> Matrix {
-        Matrix::rnd(mat_size, mat_size, nonzero_percent)
+    pub fn new_rnd_square(mat_size: usize, nonzero_percent: f64) -> Matrix {
+        Matrix::new_rnd(mat_size, mat_size, nonzero_percent)
     }
 
-    pub fn rnd_square_tria(mat_size: usize, nonzero_percent: f64) -> Matrix {
+    pub fn new_rnd_square_tria(mat_size: usize, nonzero_percent: f64) -> Matrix {
         assert!(nonzero_percent >= 0.0 && nonzero_percent <= 1.0);
         let mut m = Matrix::new_square(mat_size);
         if nonzero_percent == 0.0 { return m; }
@@ -121,8 +122,8 @@ impl Matrix {
         return m;
     }
 
-    pub fn rnd_posdef(mat_size: usize, nonzero_percent: f64) -> Matrix {
-        let a = Matrix::rnd_square(mat_size, nonzero_percent);
+    pub fn new_rnd_posdef(mat_size: usize, nonzero_percent: f64) -> Matrix {
+        let a = Matrix::new_rnd_square(mat_size, nonzero_percent);
         let a_tr = a.transpose();
         let mut p = a.mul(&a_tr);
         for diag in 0..p.nrows {
@@ -338,7 +339,7 @@ impl Matrix {
         assert!(self.nrows == self.ncols);
 
         let mut vals: Vec<f64> = self.vals.clone();
-        let mut e = Matrix::identity(self.nrows);
+        let mut e = Matrix::new_identity(self.nrows);
 
         // Проходим по диагонали
         for diag in 0..self.nrows {
@@ -502,10 +503,10 @@ impl Matrix {
     pub fn ludec(&self) -> Option<LuDec> {
         assert!(self.is_square());
         let mut m = self.clone();
-        let mut permutation_vec: Vec<usize> = Vec::new();
-        permutation_vec.resize(m.nrows, 0);
+        let mut permutation_vector: Vec<usize> = Vec::new();
+        permutation_vector.resize(m.nrows, 0);
         for i in 0..m.nrows {
-            permutation_vec[i] = i;
+            permutation_vector[i] = i;
         }
 
         for diag in 0..m.nrows
@@ -523,7 +524,7 @@ impl Matrix {
             // то обмениваем ряды.
             if row_max != diag {
                 m.swap_rows(diag, row_max);
-                permutation_vec.swap(diag, row_max);
+                permutation_vector.swap(diag, row_max);
             }
 
             // Вычисляем дополнение Шура
@@ -540,12 +541,88 @@ impl Matrix {
                 }
             }
         }
-        Some(LuDec { lu_matrix: m, permutation_vec })
+        Some(LuDec { lu_matrix: m, permutation_vector })
     }
 
     pub fn permute_rows(&mut self, permutation_vect: &Vec<usize>) {
         for r in 0..self.nrows {
             self.swap_rows(r, permutation_vect[r])
+        }
+    }
+
+    pub fn solve(&self, b: &Vec<f64>) -> Option<Vec<f64>> {
+        assert!(self.is_square());
+        assert!(self.ncols == b.len());
+
+        if let Some(lu_result) = self.ludec() {
+            return Some(lu_result.solve(b));
+        }
+        return None;
+    }
+
+    pub fn chol(&self) -> Option<Matrix> {
+        assert!(self.is_square());
+        let mut l = Matrix::new_square(self.nrows);
+
+        for r in 0..self.nrows {
+            for c in 0..r {
+                let mut sum = 0.0;
+                for k in 0..c {
+                    sum += l.get(r, k) * l.get(c, k);
+                }
+                let m_rc = self.get(r, c);
+                let l_cc = l.get(c, c);
+                let val = (m_rc - sum) / l_cc;
+                l.set(r, c, val);
+            }
+
+            let mut sum = 0.0;
+            for c in 0..r {
+                let l_rc = l.get(r, c);
+                sum += l_rc * l_rc;
+            }
+            let m_rr = self.get(r, r);
+            let val = m_rr - sum;
+            if val < 0.0 {
+                return None;
+            }
+            l.set(r, r, val.sqrt());
+        }
+        return Some(l);
+    }
+
+    pub fn dot_ci_cj(&self, i: usize, j: usize) -> f64 {
+        assert!(i < self.ncols);
+        assert!(j < self.ncols);
+        let mut dot_product = 0.0;
+        for n in 0..self.nrows {
+            dot_product += self.get(n, i) * self.get(n, j);
+        }
+        return dot_product;
+    }
+
+    pub fn ci_minus_d_cj_mut(&mut self, i: usize, d: f64, j: usize) {
+        for n in 0..self.nrows {
+            let val = self.get(n, i) - d * self.get(n, j);
+            self.set(n, i, val);
+        }
+    }
+
+    pub fn norm_col(&self, i: usize) -> f64 {
+        assert!(i < self.ncols);
+        let mut norm = 0.0;
+        for n in 0..self.nrows {
+            let val = self.get(n, i);
+            norm += val * val;
+        }
+        return norm.sqrt();
+    }
+
+    pub fn mul_col(&mut self, i: usize, coeff: f64) {
+        assert!(i < self.ncols);
+        for n in 0..self.nrows {
+            let val = self.get(n, i);
+            self.set(n, i, coeff * val);
         }
     }
 }
@@ -567,7 +644,7 @@ impl fmt::Display for Matrix {
 
 pub struct LuDec {
     lu_matrix: Matrix,
-    permutation_vec: Vec<usize>
+    permutation_vector: Vec<usize>
 }
 
 #[allow(dead_code)]
@@ -602,13 +679,13 @@ impl LuDec {
         let mat_size = self.lu_matrix.nrows;
         let mut p = Matrix::new_square(mat_size);
         for row in 0..mat_size {
-            let col = self.permutation_vec[row];
+            let col = self.permutation_vector[row];
             p.set(row, col, 1.0); 
         }
         return p;
     }
 
-    pub fn solve_ly(&self, pb: &Vec<f64>) -> Vec<f64> {
+    fn solve_ly(&self, pb: &Vec<f64>) -> Vec<f64> {
         let mat_size = self.lu_matrix.nrows;
         let mut y = vec![0.0; mat_size];
 
@@ -622,7 +699,7 @@ impl LuDec {
         return y;
     }
 
-    pub fn solve_ux(&self, y: &Vec<f64>) -> Vec<f64> {
+    fn solve_ux(&self, y: &Vec<f64>) -> Vec<f64> {
         let nrows = self.lu_matrix.nrows;
         let ncols = self.lu_matrix.ncols;
         let mut x = vec![0.0; nrows];
@@ -638,11 +715,22 @@ impl LuDec {
         return x;
     }
 
-/*
-    pub fn solve(&self, b: &Vec<f64>) -> Vec<f64> {
-        
+    fn permute_vector(&self, x: &Vec<f64>) -> Vec<f64> {
+        let mut permuted = vec![0.0; x.len()];
+        for i in 0..x.len() {
+            let pos = self.permutation_vector[i];
+            permuted[i] = x[pos];
+        }
+        return permuted;
     }
-*/
+
+    pub fn solve(&self, b: &Vec<f64>) -> Vec<f64> {
+        assert!(self.lu_matrix.ncols == b.len());
+        let pb = self.permute_vector(&b);
+        let y = self.solve_ly(&pb);
+        let x = self.solve_ux(&y);
+        return x;
+    }
 }
 
 #[cfg(test)]
@@ -687,7 +775,7 @@ mod tests {
 
     #[test]
     fn test_set_to_zero() {
-        let mut m = Matrix::rnd(5, 5, 1.0);
+        let mut m = Matrix::new_rnd(5, 5, 1.0);
         m.set_to_zero();
         assert!(m.sum() == 0.0);
         assert!(m.is_zero());
@@ -695,7 +783,7 @@ mod tests {
 
     #[test]
     fn test_set_row_zero() {
-        let mut m = Matrix::rnd(3, 4, 1.0);
+        let mut m = Matrix::new_rnd(3, 4, 1.0);
         for r in 0..m.nrows {
             m.set_row_zero(r);
         }
@@ -704,7 +792,7 @@ mod tests {
 
     #[test]
     fn test_set_col_zero() {
-        let mut m = Matrix::rnd(3, 4, 1.0);
+        let mut m = Matrix::new_rnd(3, 4, 1.0);
         for c in 0..m.ncols {
             m.set_col_zero(c);
         }
@@ -713,7 +801,7 @@ mod tests {
 
     #[test]
     fn test_identity() {
-        let m = Matrix::identity(5);
+        let m = Matrix::new_identity(5);
         assert!(m.sum() == 5.0);
     }
 
@@ -744,7 +832,7 @@ mod tests {
 
     #[test]
     fn test_transpose() {
-        let m = Matrix::rnd(3, 5, 1.0);
+        let m = Matrix::new_rnd(3, 5, 1.0);
         let m_tr = m.transpose();
         assert!(!m.equal_eps(&m_tr, EPS));
         assert!(math_utils::equal_eps(m.sum(), m_tr.sum(), EPS));
@@ -756,7 +844,7 @@ mod tests {
 
     #[test]
     fn test_swap_rows() {
-        let m_original = Matrix::rnd(3, 3, 1.0);
+        let m_original = Matrix::new_rnd(3, 3, 1.0);
         let mut m = m_original.clone();
         m.swap_rows(0, 1);
         m.swap_rows(1, 2);
@@ -767,7 +855,7 @@ mod tests {
 
     #[test]
     fn test_swap_cols() {
-        let m_original = Matrix::rnd(3, 3, 1.0);
+        let m_original = Matrix::new_rnd(3, 3, 1.0);
         let mut m = m_original.clone();
         m.swap_cols(0, 1);
         m.swap_cols(1, 2);
@@ -786,7 +874,7 @@ mod tests {
         let mut blocks: Vec<Matrix> = Vec::new();
         for r in 0..b_rows {
             for c in 0..b_cols {
-                let b = Matrix::rnd(b_size, b_size, 1.0);
+                let b = Matrix::new_rnd(b_size, b_size, 1.0);
                 a.set_block(b_size, r, c, &b);
                 blocks.push(b);
             }
@@ -826,10 +914,10 @@ mod tests {
         let nrows = 4;
         let ncols = 5;
 
-        let mut a = Matrix::rnd(nrows, ncols, 1.0);
+        let mut a = Matrix::new_rnd(nrows, ncols, 1.0);
         let mut a_sum = a.sum();
 
-        let b = Matrix::rnd(nrows, ncols, 1.0);
+        let b = Matrix::new_rnd(nrows, ncols, 1.0);
         let b_sum = b.sum();
 
         let c = a.add(&b);
@@ -846,10 +934,10 @@ mod tests {
         let nrows = 4;
         let ncols = 5;
 
-        let mut a = Matrix::rnd(nrows, ncols, 1.0);
+        let mut a = Matrix::new_rnd(nrows, ncols, 1.0);
         let mut a_sum = a.sum();
 
-        let b = Matrix::rnd(nrows, ncols, 1.0);
+        let b = Matrix::new_rnd(nrows, ncols, 1.0);
         let b_sum = b.sum();
 
         let c = a.sub(&b);
@@ -863,7 +951,7 @@ mod tests {
 
     #[test]
     fn test_mul_by_coeff() {
-        let mut a = Matrix::rnd(3, 5, 1.0);
+        let mut a = Matrix::new_rnd(3, 5, 1.0);
         let mut a_sum = a.sum();
 
         let coeff = 2.77;
@@ -878,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_div_by_coeff() {
-        let mut a = Matrix::rnd(3, 5, 1.0);
+        let mut a = Matrix::new_rnd(3, 5, 1.0);
         let mut a_sum = a.sum();
 
         let coeff = 2.77;
@@ -893,9 +981,9 @@ mod tests {
 
     #[test]
     fn test_mul() {
-        let a = Matrix::rnd(3, 5, 1.0);
-        let b = Matrix::rnd(5, 5, 1.0);
-        let c = Matrix::rnd(5, 5, 1.0);
+        let a = Matrix::new_rnd(3, 5, 1.0);
+        let b = Matrix::new_rnd(5, 5, 1.0);
+        let c = Matrix::new_rnd(5, 5, 1.0);
 
         // Testing property: (A * B) * C = A * (B * C)
         let ab = a.mul(&b);
@@ -925,9 +1013,9 @@ mod tests {
     fn test_invert() {
         let eps = 1e-8;
         let mat_size = 10;
-        let a = Matrix::rnd(mat_size, mat_size, 0.8);
-        let b = Matrix::rnd(mat_size, mat_size, 0.8);
-        let i = Matrix::identity(mat_size);
+        let a = Matrix::new_rnd(mat_size, mat_size, 0.8);
+        let b = Matrix::new_rnd(mat_size, mat_size, 0.8);
+        let i = Matrix::new_identity(mat_size);
 
         let ainv = a.invert().unwrap();
         let binv = b.invert().unwrap();
@@ -962,11 +1050,11 @@ mod tests {
         assert!(left.equal_eps(&right, eps));
 
         // Testing impossibility of inverting singular matrix.
-        let mut zero_column_matrix = Matrix::rnd_square(mat_size, 1.0);
+        let mut zero_column_matrix = Matrix::new_rnd_square(mat_size, 1.0);
         zero_column_matrix.set_col_zero(1);
         assert!(zero_column_matrix.invert().is_none());
 
-        let mut zero_row_matrix = Matrix::rnd_square(mat_size, 1.0);
+        let mut zero_row_matrix = Matrix::new_rnd_square(mat_size, 1.0);
         zero_row_matrix.set_row_zero(1);
         assert!(zero_row_matrix.invert().is_none());
     }
@@ -977,11 +1065,11 @@ mod tests {
         let eps = 1e-8;
 
         // Testing property: det(I) = 1.
-        let i = Matrix::identity(mat_size);
+        let i = Matrix::new_identity(mat_size);
         let i_det = i.det();
         assert!(math_utils::equal_eps(i_det, 1.0, eps));
 
-        let a = Matrix::rnd_square(mat_size, 1.0);
+        let a = Matrix::new_rnd_square(mat_size, 1.0);
 
         // Testing property: det(A_tr) = det(A)
         let mut left = a.transpose().det();
@@ -995,12 +1083,38 @@ mod tests {
         assert!(math_utils::equal_eps(left, right, eps));
 
         // Testing that determinant of a singular matrix equals zero.
-        let mut zero_column_matrix = Matrix::rnd_square(mat_size, 1.0);
+        let mut zero_column_matrix = Matrix::new_rnd_square(mat_size, 1.0);
         zero_column_matrix.set_col_zero(2);
         assert!(zero_column_matrix.det() == 0.0);
 
-        let mut zero_row_matrix = Matrix::rnd_square(mat_size, 1.0);
+        let mut zero_row_matrix = Matrix::new_rnd_square(mat_size, 1.0);
         zero_row_matrix.set_row_zero(2);
         assert!(zero_row_matrix.det() == 0.0);
+    }
+
+    #[test]
+    fn test_ludec() {
+        let mat_size = 50;
+        let a = Matrix::new_rnd_square(mat_size, 0.8);
+        let lu_result = a.ludec().unwrap();
+        let l = lu_result.get_lower_matrix();
+        let u = lu_result.get_upper_matrix();
+        let p = lu_result.get_permutation_matrix();
+        let pa = p.mul(&a);
+        let lu = l.mul(&u);
+        assert![pa.equal_eps(&lu, EPS)];
+    }
+
+    #[test]
+    fn test_solve() {
+        let n_tests: usize = 100;
+        let mat_size = 100;
+        let eps = 1e-6;
+
+        for _ in 0..n_tests {
+            let a = Matrix::new_rnd_square(mat_size, 0.7);
+            let b = vect_utils::new_rnd(mat_size);
+            
+        }
     }
 }
