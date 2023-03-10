@@ -327,6 +327,18 @@ impl Matrix {
         }
     }
 
+    pub fn mul_by_vector(&self, x: &Vec<f64>) -> Vec<f64> {
+        assert!(self.ncols == x.len());
+        let mut b = vec![0.0; self.nrows];
+        for c in 0..self.ncols {
+            let coeff = x[c];
+            for r in 0..self.nrows {
+                b[r] += coeff * self.get(r, c);
+            }
+        }
+        return b;
+    }
+
     pub fn div_by_coeff(&self, coeff: f64) -> Matrix {
         self.mul_by_coeff(1.0 / coeff)
     }
@@ -624,6 +636,10 @@ impl Matrix {
             let val = self.get(n, i);
             self.set(n, i, coeff * val);
         }
+    }
+
+    pub fn qr() { 
+        // Not implemented
     }
 }
 
@@ -1094,8 +1110,8 @@ mod tests {
 
     #[test]
     fn test_ludec() {
-        let mat_size = 50;
-        let a = Matrix::new_rnd_square(mat_size, 0.8);
+        let mat_size = 20;
+        let a = Matrix::new_rnd_square(mat_size, 1.0);
         let lu_result = a.ludec().unwrap();
         let l = lu_result.get_lower_matrix();
         let u = lu_result.get_upper_matrix();
@@ -1108,13 +1124,36 @@ mod tests {
     #[test]
     fn test_solve() {
         let n_tests: usize = 100;
-        let mat_size = 100;
-        let eps = 1e-6;
+        let mat_size = 10;
+        let eps = 1e-10;
 
         for _ in 0..n_tests {
-            let a = Matrix::new_rnd_square(mat_size, 0.7);
+            let a = Matrix::new_rnd_square(mat_size, 1.0);
             let b = vect_utils::new_rnd(mat_size);
-            
+            let x = a.solve(&b).unwrap();
+            let b_test = a.mul_by_vector(&x);
+            assert!(vect_utils::equal_eps(&b, &b_test, eps));
         }
+    }
+
+    #[test]
+    fn test_chol() {
+        let mat_size = 20;
+        let a = Matrix::new_rnd_posdef(mat_size, 1.0);
+        let l = a.chol().unwrap();
+        let l_tr = l.transpose();
+        let a_test = l.mul(&l_tr);
+        assert!(a.equal_eps(&a_test, EPS));
+    }
+
+    #[test]
+    fn test_invert_lower_triangular() {
+        let mat_size = 20;
+        let a = Matrix::new_rnd_posdef(mat_size, 1.0);
+        let l = a.chol().unwrap();
+        let l_inv = l.invert_lower_triangular();
+        let i = Matrix::new_identity(mat_size);
+        let i_test = l.mul(&l_inv);
+        assert!(i.equal_eps(&i_test, 1e-10));
     }
 }
